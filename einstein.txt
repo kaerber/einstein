@@ -1,0 +1,53 @@
+На улице стоят пять домов.
+Англичанин живёт в красном доме.
+У испанца есть собака.
+В зелёном доме пьют кофе.
+Украинец пьёт чай.
+Зелёный дом стоит сразу справа от белого дома.
+Тот, кто курит Old Gold, разводит улиток.
+В жёлтом доме курят Kool.
+В центральном доме пьют молоко.
+Норвежец живёт в первом доме.
+Сосед того, кто курит Chesterfield, держит лису.
+В доме по соседству с тем, в котором держат лошадь, курят Kool.
+Тот, кто курит Lucky Strike, пьёт апельсиновый сок.
+Японец курит Parliament.
+Норвежец живёт рядом с синим домом.
+
+Кто пьёт воду? 
+Кто держит зебру?
+
+связь атрибутов
+справа
+соседний дом
+
+attributes
+house:ordinal:1 5
+color:attr:red green white yellow blue
+nation:attr:english spanish ukrainian norwegian japanese
+animal:attr:dog snail fox horse zebra
+drink:attr:coffee tea milk orangejuice water
+smoke:oldgold kool chesterfield luckystrike parliament
+
+knowledge
+same color:red nation:english
+same nation:spanish animal:dog
+same color:green drink:coffee
+same nation:ukrainian drink:tea
+offset:house:1 color:white color:green
+same smoke:oldgold animal:snail
+same color:yellow smoke:kool
+same house:3 drink:milk
+same nation:norwegian house:1
+dist:house:1 smoke:chesterfield animal:fox
+dist:house:1 animal:horse smoke:kool
+same smoke:luckystrike drink:orangejuice
+same nation:japanese smoke:parliament
+dist:house:1 nation:norwegian color:blue
+
+queries:
+drink:water nation
+animal:zebra nation
+
+
+
