@@ -87,9 +87,10 @@ class Relation:
 
 
 class Solver:
-    def __init__(self):
+    def __init__(self, attrs):
         self.map = {}
         self.list = []
+        self.attrs = attrs
 
     def add(self, rule):
         self.list.append(rule)
@@ -97,9 +98,6 @@ class Solver:
             self.map[rule.relation] = rule
         return self
     
-    def __contains__(self, relation):
-        return relation in self.map
-
     def get(self, relation):
         if relation not in self.map:
             return None
@@ -110,6 +108,17 @@ class Solver:
 
     def is_different(self, relation):
         return relation in self.map and isinstance(self.map[relation], Different)
+    
+    def iter(self):
+        # foreach relation
+        # relation in map: continue
+        # foreach rule in list
+        # apply rule to relation
+        # if rule returned: add rule to map and to list
+        pass
+
+    def __contains__(self, relation):
+        return relation in self.map
 
 
 class Exclusive:
