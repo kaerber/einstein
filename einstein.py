@@ -48,7 +48,7 @@ class AttrValue:
         return self.attr == other.attr and self.value == other.value
 
     def __str__(self):
-        return str(self.attr) + "[" + self.index + "]" +  ":" + self.value
+        return str(self.attr) + ":" + str(self.value)
 
     def __repr__(self):
         return str(self)
@@ -84,6 +84,12 @@ class Relation:
         if type(self) != type(other):
             return False
         return self.atval1 == other.atval1 and self.atval2 == other.atval2
+    
+    def __str__(self):
+        return str(self.atval1) + "<->" + str(self.atval2)
+    
+    def __repr__(self):
+        return str(self)
 
 
 class Solver:
@@ -94,7 +100,7 @@ class Solver:
 
     def add(self, rule):
         self.list.append(rule)
-        if rule.relation != None:
+        if hasattr(rule, 'relation') and rule.relation != None:
             self.map[rule.relation] = rule
         return self
     
@@ -109,13 +115,31 @@ class Solver:
     def is_different(self, relation):
         return relation in self.map and isinstance(self.map[relation], Different)
     
+    def solve(self):
+        while self.iter():
+            pass
+
     def iter(self):
-        # foreach relation
-        # relation in map: continue
-        # foreach rule in list
-        # apply rule to relation
-        # if rule returned: add rule to map and to list
-        pass
+        success = False
+        for i in range(len(self.attrs)):
+            attr1 = self.attrs[i]
+            for j in range(i+1, len(self.attrs)):
+                attr2 = self.attrs[j]
+                for atval1 in attr1.ordered_values:
+                    for atval2 in attr2.ordered_values:
+                        relation = Relation(atval1, atval2)
+                        if relation in self.map:
+                            continue
+                        for rule in self.list:
+                            result = rule.evaluate(relation)
+                            if result == None:
+                                continue
+                            success = True
+                            self.map[relation] = result
+                            self.list.append(result)
+                            break
+
+        return success
 
     def __contains__(self, relation):
         return relation in self.map

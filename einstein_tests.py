@@ -277,6 +277,57 @@ class SameTests(unittest.TestCase):
         result = rule_under_test.evaluate(Relation(self.A[1], self.B[3]))
         self.assertIsNone(result)
 
+class SolverTests(unittest.TestCase):
+    def test_iter_same_causes_different_with_exclusive(self):
+        house = Attr('house', 0, [1, 2, 3])
+        color = Attr('color', 1, ['red', 'green', 'blue'])
+        solver = Solver([house, color])
+        solver.add(Exclusive(solver))
+        solver.add(Same(Relation(house[2], color.green)))
+        
+        solver.iter()
+
+        self.assertTrue(solver.is_different(Relation(house[1], color.green)))
+        self.assertTrue(solver.is_different(Relation(house[3], color.green)))
+        self.assertTrue(solver.is_different(Relation(house[2], color.red)))
+        self.assertTrue(solver.is_different(Relation(house[2], color.blue)))
+
+    def test_iter_all_different_causes_same_with_exclusive(self):
+        house = Attr('house', 0, [1, 2, 3])
+        color = Attr('color', 1, ['red', 'green', 'blue'])
+        solver = Solver([house, color])
+        solver.add(Exclusive(solver))
+        solver.add(Different(Relation(house[1], color.green)))
+        solver.add(Different(Relation(house[3], color.green)))
+
+        solver.iter()
+
+        self.assertTrue(solver.is_same(Relation(house[2], color.green)))
+
+    def test_iter_two_sides_different_causes_different_with_distance(self):
+        house = Attr('house', 0, [1, 2, 3])
+        color = Attr('color', 1, ['red', 'green', 'blue'])
+        solver = Solver([house, color])
+        solver.add(Distance(solver, color.green, color.red, house, 1))
+        solver.add(Different(Relation(color.red, house[1])))
+        solver.add(Different(Relation(color.red, house[3])))
+
+        solver.iter()
+
+        self.assertTrue(solver.is_different(Relation(color.green, house[2])))
+
+    def test_iter_side_different_causes_different_with_offset(self):
+        house = Attr('house', 0, [1, 2, 3])
+        color = Attr('color', 1, ['red', 'green', 'blue'])
+        solver = Solver([house, color])
+        solver.add(Offset(solver, color.green, color.red, house, 1))
+        solver.add(Different(Relation(color.red, house[1])))
+
+        solver.iter()
+
+        self.assertTrue(solver.is_different(Relation(color.green, house[2])))
+
+
 class SolverAcceptanceTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
