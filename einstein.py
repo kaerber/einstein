@@ -97,8 +97,11 @@ class Solver:
         self.map = {}
         self.list = []
         self.attrs = attrs
+        self.debug = False
 
     def add(self, rule):
+        rule.solver = self
+
         self.list.append(rule)
         if hasattr(rule, 'relation') and rule.relation != None:
             self.map[rule.relation] = rule
@@ -135,8 +138,9 @@ class Solver:
                             if result == None:
                                 continue
                             success = True
-                            self.map[relation] = result
-                            self.list.append(result)
+                            self.add(result)
+                            if self.debug:
+                                print(result, "     <-  ", rule, "on", relation)
                             break
 
         return success
@@ -146,12 +150,14 @@ class Solver:
 
 
 class Exclusive:
-    def __init__(self, matrix):
-        self.matrix = matrix
+    def __init__(self):
+        self.solver = None
 
     def evaluate(self, relation):
         a1 = relation.atval1
         a2 = relation.atval2
+        #if self.solver.debug:
+        #    print("Exclusive", relation, self.check_all_filled(a1, a2), self.check_all_filled(a2, a1))
         if self.check_all_filled(a1, a2) or self.check_all_filled(a2, a1):
             return Same(relation)
 
@@ -159,9 +165,12 @@ class Exclusive:
         for slider in sliding.attr.values.values():
             if slider == sliding:
                 continue
-            if not self.matrix.is_different(Relation(fixed, slider)):
+            if not self.solver.is_different(Relation(fixed, slider)):
                 return False
         return True
+    
+    def __str__(self):
+        return "Exclusive"
 
 class Offset:
     # дом не такой = дом не существует, или не такой
@@ -169,16 +178,18 @@ class Offset:
     # Зелёный дом стоит сразу справа от белого дома.
     # - если дом X-1 - не белый, то дом X - не зеленый| (X, зеленый): if ~(X-1, белый) -> Different
     # - если дом X+1 - не зеленый, то дом X - не белый| (X, белый): if ~(X+1, зеленый) -> Different
+    # - если дом Х+1 - зеленый, то дом Х - белый
+    # - если дом Х-1 - белый, то дом Х - зеленый
 
     # matrix - матрица связей
     # atval1 - значение атрибута первой сущности в паре (цвет:зеленый для загадки Эйнштейна)
     # atval2 - значение атрибута второй сущности в паре (цвет:белый для загадки Эйнштейна)
     # offset_attr - атрибут, по которому считается смещение (порядок_домов для загадки Эйнштейна)
     # offset - смещение atval1 от atval2 по offset_attr (+1 для загадки Эйнштейна), может быть отрицательным, не может быть 0
-    def __init__(self, matrix, atval1, atval2, offset_attr, offset):
+    def __init__(self, atval1, atval2, offset_attr, offset):
         assert(offset != 0)
 
-        self.matrix = matrix
+        self.solver = None
         self.atval1 = atval1
         self.atval2 = atval2
         self.offset_attr = offset_attr
@@ -193,14 +204,23 @@ class Offset:
         if relation.with_atval(self.atval1):
             offset_val = cur_offset_val.offset_value(-self.offset)
             if (offset_val == None
-                or self.matrix.is_different(Relation(offset_val, self.atval2))):
+                or self.solver.is_different(Relation(offset_val, self.atval2))):
                 return Different(relation)
+            if (offset_val != None
+                and self.solver.is_same(Relation(offset_val, self.atval2))):
+                return Same(relation)
 
         if relation.with_atval(self.atval2):
             offset_val = cur_offset_val.offset_value(+self.offset)
             if (offset_val == None
-                or self.matrix.is_different(Relation(offset_val, self.atval1))):
+                or self.solver.is_different(Relation(offset_val, self.atval1))):
                 return Different(relation)
+            if (offset_val != None
+                and self.solver.is_same(Relation(offset_val, self.atval1))):
+                return Same(relation)
+            
+    def __str__(self):
+        return "Offset " + str(self.atval1) + ":" + str(self.offset_attr) + "(" + str(self.offset) + "):" + str(self.atval2)
 
 class Distance:
     # дом не такой = дом не существует, или не такой
@@ -208,16 +228,20 @@ class Distance:
     # Сосед того, кто курит Chesterfield, держит лису.
     # - если в доме Х-1 курят не честерфилд, и в доме Х+1 курят не честерфилд, то в доме Х не лиса
     # - если в доме Х-1 не лиса, и в доме Х+1 не лиса, то в доме Х курят не честерфилд
+    # - если в доме X-1 курят честерфилд, и в доме Х-2 не лиса, то в доме Х лиса
+    # - если в доме Х+1 курят честерфилд, и в доме Х+2 не лиса, то в доме Х лиса
+    # - если в доме Х-1 держат лису, и в доме Х-2 курят не честерфилд, то в доме Х курят честерфилд
+    # - если в доме Х+1 держат лису, и в доме Х+2 курят не честерфилд, то в доме Х курят честерфилд
 
     # matrix - матрица связей
     # atval1 - значение атрибута первой сущности в паре (курит:chesterfield для загадки Эйнштейна)
     # atval2 - значение атрибута второй сущности в паре (держит:лиса для загадки Эйнштейна)
     # distance_attr - атрибут, по которому считается расстояние (порядок_домов для загадки Эйнштейна)
     # distance - расстояние atval1 от atval2 по distance_attr (1 для загадки Эйнштейна), строго положительное число
-    def __init__(self, matrix, atval1, atval2, distance_attr, distance):
+    def __init__(self, atval1, atval2, distance_attr, distance):
         assert(distance > 0)
 
-        self.matrix = matrix
+        self.solver = None
         self.atval1 = atval1
         self.atval2 = atval2
         self.distance_attr = distance_attr
@@ -229,50 +253,102 @@ class Distance:
 
         cur_distance_val = relation.atval(self.distance_attr)
         left_distance_val = cur_distance_val.offset_value(-self.distance)
+        far_left_distance_val = cur_distance_val.offset_value(-2*self.distance)
         right_distance_val = cur_distance_val.offset_value(+self.distance)
+        far_right_distance_val = cur_distance_val.offset_value(+2*self.distance)
         
         if relation.with_atval(self.atval1):
             if ((left_distance_val == None
-                    or self.matrix.is_different(Relation(left_distance_val, self.atval2)))
+                    or self.solver.is_different(Relation(left_distance_val, self.atval2)))
                 and (right_distance_val == None
-                    or self.matrix.is_different(Relation(right_distance_val, self.atval2)))):
+                    or self.solver.is_different(Relation(right_distance_val, self.atval2)))):
                 return Different(relation)
+            
+            if (left_distance_val != None
+                and self.solver.is_same(Relation(left_distance_val, self.atval2))
+                and (far_left_distance_val == None
+                    or self.solver.is_different(Relation(far_left_distance_val, self.atval1)))):
+                return Same(relation)
 
+            if (right_distance_val != None
+                and self.solver.is_same(Relation(right_distance_val, self.atval2))
+                and (far_right_distance_val == None
+                    or self.solver.is_different(Relation(far_right_distance_val, self.atval1)))):
+                return Same(relation)
+            
         if relation.with_atval(self.atval2):
             if ((left_distance_val == None
-                    or self.matrix.is_different(Relation(left_distance_val, self.atval1)))
+                    or self.solver.is_different(Relation(left_distance_val, self.atval1)))
                 and (right_distance_val == None
-                    or self.matrix.is_different(Relation(right_distance_val, self.atval1)))):
+                    or self.solver.is_different(Relation(right_distance_val, self.atval1)))):
                 return Different(relation)
+            
+            if (left_distance_val != None
+                and self.solver.is_same(Relation(left_distance_val, self.atval1))
+                and (far_left_distance_val == None
+                    or self.solver.is_different(Relation(far_left_distance_val, self.atval2)))):
+                return Same(relation)
+
+            if (right_distance_val != None
+                and self.solver.is_same(Relation(right_distance_val, self.atval1))
+                and (far_right_distance_val == None
+                    or self.solver.is_different(Relation(far_right_distance_val, self.atval2)))):
+                return Same(relation)
+            
+    def __str__(self):
+        return "Distance " + str(self.atval1) + ":" + str(self.distance_attr) + "(" + str(self.distance) + "):" + str(self.atval2)
 
 class Same:
     def __init__(self, relation):
         self.relation = relation
+        self.solver = None
 
     def evaluate(self, relation):
         a1 = self.relation.atval1
         a2 = self.relation.atval2
         # same attributes
-        if not (relation.with_attr(a1.attr) and relation.with_attr(a2.attr)):
-            return None
-        # one attribute value is the same (another is not the same) - considered relation is negative
+        if relation.with_attr(a1.attr) and relation.with_attr(a2.attr):
+            # one attribute value is the same (another is not the same) - considered relation is negative
+            if relation.with_atval(a1):
+                return Different(relation)
+            if relation.with_atval(a2):
+                return Different(relation)
+            
         if relation.with_atval(a1):
-            return Different(relation)
-        if relation.with_atval(a2):
-            return Different(relation)
+            rel_a2 = relation.atval2 if relation.atval1 == a1 else relation.atval1
+            proxy_rel = Relation(a2, rel_a2)
+            if self.solver.is_same(proxy_rel):
+                return Same(relation)
+            if self.solver.is_different(proxy_rel):
+                return Different(relation)
         
+        if relation.with_atval(a2):
+            rel_a2 = relation.atval2 if relation.atval1 == a2 else relation.atval1
+            proxy_rel = Relation(a1, rel_a2)
+            if self.solver.is_same(proxy_rel):
+                return Same(relation)
+            if self.solver.is_different(proxy_rel):
+                return Different(relation)
+
         return None
 
+    def __str__(self):
+        return "Same " + str(self.relation)
+    
     @classmethod
     def of(cls, atval1, atval2):
         return cls(Relation(atval1, atval2))
 
 class Different:
     def __init__(self, relation):
+        self.solver = None
         self.relation = relation
 
     def evaluate(self, relation):
         return None
+
+    def __str__(self):
+        return "Different " + str(self.relation)
 
     @classmethod
     def of(cls, atval1, atval2):
